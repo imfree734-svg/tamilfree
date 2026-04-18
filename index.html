@@ -1,199 +1,332 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>E-Commerce App</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
-<style>
-body {
-  font-family: Arial;
-  margin: 0;
-  background: #f4f4f4;
-}
-
-header {
-  background: #111;
-  color: #fff;
-  padding: 10px;
-  text-align: center;
-}
-
-.container {
-  padding: 20px;
-}
-
-.products {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.card {
-  background: #fff;
-  padding: 15px;
-  border-radius: 10px;
-  box-shadow: 0 0 10px #ccc;
-  text-align: center;
-}
-
-.card img {
-  width: 100%;
-  height: 150px;
-  object-fit: cover;
-}
-
-button {
-  padding: 10px;
-  border: none;
-  background: green;
-  color: white;
-  cursor: pointer;
-  border-radius: 5px;
-}
-
-.cart {
-  position: fixed;
-  right: 0;
-  top: 0;
-  background: white;
-  width: 300px;
-  height: 100%;
-  padding: 20px;
-  box-shadow: -2px 0 10px #ccc;
-  overflow-y: auto;
-}
-
-input {
-  padding: 10px;
-  margin: 5px;
-  width: 90%;
-}
-
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BetKing — Premier Betting Platform</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
-
 <body>
 
-<header>
-  <h1>My E-Commerce Store</h1>
-</header>
+<!-- ═══════════════════ LOADING SCREEN ═══════════════════ -->
+<div id="loader">
+  <div class="loader-logo">BET<span>KING</span></div>
+  <div class="loader-bar"><div class="loader-fill"></div></div>
+</div>
 
-<div class="container">
-
-  <div id="auth">
-    <input type="email" id="email" placeholder="Email">
-    <input type="password" id="password" placeholder="Password">
-    <button onclick="signup()">Sign Up</button>
-    <button onclick="login()">Login</button>
+<!-- ═══════════════════ AUTH MODAL ═══════════════════ -->
+<div id="auth-modal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('auth-modal')">✕</button>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuthTab('login')">Login</button>
+      <button class="auth-tab" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+    <div id="login-form" class="auth-form">
+      <h2>Welcome Back</h2>
+      <input type="email" id="login-email" placeholder="Email address"/>
+      <input type="password" id="login-password" placeholder="Password"/>
+      <button class="btn-primary" onclick="handleLogin()">Login</button>
+      <p class="auth-err" id="login-error"></p>
+    </div>
+    <div id="signup-form" class="auth-form hidden">
+      <h2>Create Account</h2>
+      <input type="text" id="signup-name" placeholder="Full name"/>
+      <input type="email" id="signup-email" placeholder="Email address"/>
+      <input type="password" id="signup-password" placeholder="Password (min 6 chars)"/>
+      <button class="btn-primary" onclick="handleSignup()">Create Account</button>
+      <p class="auth-err" id="signup-error"></p>
+    </div>
   </div>
-
-  <h2>Products</h2>
-  <div class="products" id="productList"></div>
-
 </div>
 
-<div class="cart" id="cart">
-  <h3>Cart</h3>
-  <ul id="cartItems"></ul>
-  <h4 id="total">Total: ₹0</h4>
-  <button onclick="pay()">Checkout</button>
+<!-- ═══════════════════ DEPOSIT MODAL ═══════════════════ -->
+<div id="deposit-modal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-box deposit-box">
+    <button class="modal-close" onclick="closeModal('deposit-modal')">✕</button>
+    <h2>Add Funds</h2>
+    <div class="amount-grid">
+      <button class="amount-chip" onclick="setAmount(100)">₹100</button>
+      <button class="amount-chip" onclick="setAmount(500)">₹500</button>
+      <button class="amount-chip" onclick="setAmount(1000)">₹1,000</button>
+      <button class="amount-chip" onclick="setAmount(5000)">₹5,000</button>
+    </div>
+    <input type="number" id="deposit-amount" placeholder="Enter amount (₹)" min="100"/>
+    <button class="btn-primary" onclick="initiatePayment()">Pay with Razorpay</button>
+    <p class="secure-note">🔒 Secured by Razorpay</p>
+  </div>
 </div>
 
-<script>
+<!-- ═══════════════════ BET SLIP MODAL ═══════════════════ -->
+<div id="betslip-modal" class="modal hidden">
+  <div class="modal-backdrop"></div>
+  <div class="modal-box betslip-box">
+    <button class="modal-close" onclick="closeModal('betslip-modal')">✕</button>
+    <h2>Place Bet</h2>
+    <div id="bet-details" class="bet-details"></div>
+    <div class="stake-row">
+      <label>Stake (₹)</label>
+      <input type="number" id="stake-input" min="10" placeholder="Enter stake"/>
+    </div>
+    <div class="payout-row">
+      <span>Potential Win</span>
+      <span id="potential-win" class="win-amount">₹0.00</span>
+    </div>
+    <button class="btn-primary" onclick="placeBet()">Confirm Bet</button>
+    <p class="auth-err" id="bet-error"></p>
+  </div>
+</div>
 
-// 🔑 CONFIG
-const SUPABASE_URL = "https://opihlskhqvbojkhdmjgz.supabase.co";
-const SUPABASE_KEY = "sb_publishable_UwKSMM5fuGrdTwZ9o_zO0g_m2hIuhAc";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+<!-- ═══════════════════ TOAST ═══════════════════ -->
+<div id="toast" class="toast hidden"></div>
 
-// 🛒 CART
-let cart = [];
-
-// AUTH
-async function signup() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const { error } = await supabase.auth.signUp({ email, password });
-  alert(error ? error.message : "Signup successful!");
-}
-
-async function login() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  alert(error ? error.message : "Login successful!");
-}
-
-// LOAD PRODUCTS
-async function loadProducts() {
-  const { data, error } = await supabase.from('products').select('*');
-  const container = document.getElementById("productList");
-  container.innerHTML = "";
-
-  data.forEach(p => {
-    container.innerHTML += `
-      <div class="card">
-        <img src="${p.image}" />
-        <h3>${p.name}</h3>
-        <p>₹${p.price}</p>
-        <button onclick='addToCart(${JSON.stringify(p)})'>Add</button>
+<!-- ═══════════════════ NAVBAR ═══════════════════ -->
+<nav class="navbar">
+  <div class="nav-left">
+    <div class="logo">BET<span>KING</span></div>
+    <div class="nav-links">
+      <a href="#" onclick="showPage('home')" class="nav-link active" id="nav-home">🏠 Home</a>
+      <a href="#" onclick="showPage('sports')" class="nav-link" id="nav-sports">⚽ Sports</a>
+      <a href="#" onclick="showPage('casino')" class="nav-link" id="nav-casino">🎰 Casino</a>
+      <a href="#" onclick="showPage('my-bets')" class="nav-link" id="nav-my-bets">📋 My Bets</a>
+    </div>
+  </div>
+  <div class="nav-right" id="nav-auth">
+    <div id="nav-guest" class="nav-guest">
+      <button class="btn-outline" onclick="openModal('auth-modal')">Login</button>
+      <button class="btn-primary" onclick="openModal('auth-modal')">Sign Up</button>
+    </div>
+    <div id="nav-user" class="nav-user hidden">
+      <div class="wallet-display" onclick="openModal('deposit-modal')">
+        <span class="wallet-icon">💰</span>
+        <span id="wallet-balance">₹0.00</span>
+        <span class="plus-btn">+</span>
       </div>
-    `;
-  });
-}
+      <div class="user-menu">
+        <span id="user-name-display">User</span>
+        <button class="btn-outline sm" onclick="handleLogout()">Logout</button>
+      </div>
+    </div>
+  </div>
+</nav>
 
-// ADD TO CART
-function addToCart(product) {
-  cart.push(product);
-  renderCart();
-}
+<!-- ═══════════════════ PAGES ═══════════════════ -->
+<main id="main-content">
 
-// RENDER CART
-function renderCart() {
-  const list = document.getElementById("cartItems");
-  list.innerHTML = "";
-  let total = 0;
+  <!-- HOME PAGE -->
+  <section id="page-home" class="page active">
+    <div class="hero">
+      <div class="hero-bg">
+        <div class="hero-orb orb1"></div>
+        <div class="hero-orb orb2"></div>
+        <div class="hero-orb orb3"></div>
+      </div>
+      <div class="hero-content">
+        <div class="hero-badge">🔥 Live Now · 240+ Events</div>
+        <h1 class="hero-title">THE ULTIMATE<br/><span class="gold">BETTING</span> ARENA</h1>
+        <p class="hero-sub">Sports betting · Casino games · Real-time odds · Instant withdrawals</p>
+        <div class="hero-actions">
+          <button class="btn-primary lg" onclick="showPage('sports')">Bet on Sports</button>
+          <button class="btn-outline lg" onclick="showPage('casino')">Play Casino</button>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><span class="stat-num">₹2.4Cr+</span><span class="stat-label">Paid Out Today</span></div>
+          <div class="stat"><span class="stat-num">18K+</span><span class="stat-label">Active Players</span></div>
+          <div class="stat"><span class="stat-num">240+</span><span class="stat-label">Live Events</span></div>
+        </div>
+      </div>
+    </div>
 
-  cart.forEach(item => {
-    total += item.price;
-    list.innerHTML += `<li>${item.name} - ₹${item.price}</li>`;
-  });
+    <!-- FEATURED EVENTS -->
+    <div class="section">
+      <div class="section-header">
+        <h2>🔥 Featured Events</h2>
+        <a href="#" onclick="showPage('sports')" class="see-all">See All →</a>
+      </div>
+      <div class="events-grid" id="featured-events"></div>
+    </div>
 
-  document.getElementById("total").innerText = "Total: ₹" + total;
-}
+    <!-- PROMOTIONS -->
+    <div class="section">
+      <h2>🎁 Promotions</h2>
+      <div class="promo-grid">
+        <div class="promo-card promo-welcome">
+          <div class="promo-icon">🎉</div>
+          <h3>Welcome Bonus</h3>
+          <p>Get 100% bonus on your first deposit up to ₹10,000</p>
+          <button class="btn-primary sm" onclick="openModal('deposit-modal')">Claim Now</button>
+        </div>
+        <div class="promo-card promo-cashback">
+          <div class="promo-icon">💸</div>
+          <h3>Weekly Cashback</h3>
+          <p>5% cashback on net losses every Monday</p>
+          <button class="btn-outline sm">Learn More</button>
+        </div>
+        <div class="promo-card promo-refer">
+          <div class="promo-icon">👥</div>
+          <h3>Refer & Earn</h3>
+          <p>Earn ₹500 for every friend you refer</p>
+          <button class="btn-outline sm">Share Link</button>
+        </div>
+      </div>
+    </div>
+  </section>
 
-// 💳 RAZORPAY PAYMENT
-function pay() {
-  let total = cart.reduce((sum, item) => sum + item.price, 0);
+  <!-- SPORTS PAGE -->
+  <section id="page-sports" class="page">
+    <div class="page-hero sports-hero">
+      <h1>⚽ Sports Betting</h1>
+      <p>Live odds on Cricket, Football, Tennis & more</p>
+    </div>
+    <div class="section">
+      <div class="sport-tabs">
+        <button class="sport-tab active" onclick="filterSport('cricket', this)">🏏 Cricket</button>
+        <button class="sport-tab" onclick="filterSport('football', this)">⚽ Football</button>
+        <button class="sport-tab" onclick="filterSport('tennis', this)">🎾 Tennis</button>
+        <button class="sport-tab" onclick="filterSport('kabaddi', this)">🤼 Kabaddi</button>
+        <button class="sport-tab" onclick="filterSport('all', this)">All Sports</button>
+      </div>
+      <div id="sports-events" class="sports-list"></div>
+    </div>
+  </section>
 
-  const options = {
-    key: "YOUR_RAZORPAY_KEY",
-    amount: total * 100,
-    currency: "INR",
-    name: "My Store",
-    description: "Test Transaction",
-    handler: function (response) {
-      alert("Payment Successful! ID: " + response.razorpay_payment_id);
-      cart = [];
-      renderCart();
-    },
-    theme: {
-      color: "#3399cc"
-    }
-  };
+  <!-- CASINO PAGE -->
+  <section id="page-casino" class="page">
+    <div class="page-hero casino-hero">
+      <h1>🎰 Casino Games</h1>
+      <p>Dice · Coin Flip · Roulette · Crash</p>
+    </div>
+    <div class="section">
+      <div class="casino-grid">
+        <!-- DICE GAME -->
+        <div class="casino-card" id="dice-game">
+          <div class="casino-card-header">🎲 Dice Roll</div>
+          <div class="casino-card-body">
+            <div class="dice-display" id="dice-display">?</div>
+            <div class="dice-controls">
+              <label>Predict: Over / Under <span id="dice-target-val">50</span></label>
+              <input type="range" id="dice-target" min="2" max="98" value="50" oninput="updateDiceTarget(this.value)"/>
+              <div class="dice-odds-row">
+                <div class="dice-btn active" id="dice-under-btn" onclick="selectDiceSide('under')">
+                  Under <span id="dice-under-odds">1.96x</span>
+                </div>
+                <div class="dice-btn" id="dice-over-btn" onclick="selectDiceSide('over')">
+                  Over <span id="dice-over-odds">1.96x</span>
+                </div>
+              </div>
+              <input type="number" id="dice-stake" placeholder="Stake (₹)" min="10"/>
+              <button class="btn-primary" onclick="playDice()">Roll Dice</button>
+            </div>
+          </div>
+        </div>
 
-  const rzp = new Razorpay(options);
-  rzp.open();
-}
+        <!-- COIN FLIP -->
+        <div class="casino-card" id="coin-game">
+          <div class="casino-card-header">🪙 Coin Flip</div>
+          <div class="casino-card-body">
+            <div class="coin-display" id="coin-display">
+              <div class="coin" id="coin-elem">
+                <div class="coin-face heads">H</div>
+                <div class="coin-face tails">T</div>
+              </div>
+            </div>
+            <div class="coin-controls">
+              <div class="coin-choice-row">
+                <button class="coin-choice-btn active" id="heads-btn" onclick="selectCoin('heads')">👑 Heads</button>
+                <button class="coin-choice-btn" id="tails-btn" onclick="selectCoin('tails')">✦ Tails</button>
+              </div>
+              <p class="odds-label">Odds: <strong>2.00x</strong></p>
+              <input type="number" id="coin-stake" placeholder="Stake (₹)" min="10"/>
+              <button class="btn-primary" onclick="playCoin()">Flip Coin</button>
+            </div>
+          </div>
+        </div>
 
-// INIT
-loadProducts();
+        <!-- CRASH GAME -->
+        <div class="casino-card wide" id="crash-game">
+          <div class="casino-card-header">🚀 Crash</div>
+          <div class="casino-card-body crash-body">
+            <div class="crash-chart-wrap">
+              <canvas id="crash-canvas" width="500" height="220"></canvas>
+              <div class="crash-multiplier" id="crash-multiplier">1.00x</div>
+            </div>
+            <div class="crash-controls">
+              <input type="number" id="crash-stake" placeholder="Stake (₹)" min="10"/>
+              <input type="number" id="crash-auto-cashout" placeholder="Auto cashout (e.g. 2.5)" step="0.1" min="1.1"/>
+              <button class="btn-primary" id="crash-bet-btn" onclick="playCrash()">Place Bet</button>
+              <button class="btn-gold hidden" id="crash-cashout-btn" onclick="cashoutCrash()">💰 Cash Out</button>
+              <p class="crash-history-label">Recent:</p>
+              <div id="crash-history" class="crash-history"></div>
+            </div>
+          </div>
+        </div>
 
-</script>
+        <!-- ROULETTE -->
+        <div class="casino-card wide" id="roulette-game">
+          <div class="casino-card-header">🎡 Roulette</div>
+          <div class="casino-card-body roulette-body">
+            <div class="roulette-wheel-wrap">
+              <canvas id="roulette-canvas" width="280" height="280"></canvas>
+              <div class="roulette-pointer">▼</div>
+              <div class="roulette-result" id="roulette-result"></div>
+            </div>
+            <div class="roulette-controls">
+              <div class="roulette-bets-grid" id="roulette-bets"></div>
+              <input type="number" id="roulette-stake" placeholder="Stake (₹)" min="10"/>
+              <button class="btn-primary" onclick="playRoulette()">Spin!</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
+  <!-- MY BETS PAGE -->
+  <section id="page-my-bets" class="page">
+    <div class="page-hero mybets-hero">
+      <h1>📋 My Bets</h1>
+      <p>Your betting history & active bets</p>
+    </div>
+    <div class="section">
+      <div class="bets-filter">
+        <button class="bets-filter-btn active" onclick="filterBets('all', this)">All</button>
+        <button class="bets-filter-btn" onclick="filterBets('pending', this)">Pending</button>
+        <button class="bets-filter-btn" onclick="filterBets('won', this)">Won</button>
+        <button class="bets-filter-btn" onclick="filterBets('lost', this)">Lost</button>
+      </div>
+      <div id="bets-list" class="bets-list">
+        <div class="empty-state">
+          <p>No bets yet. <a href="#" onclick="showPage('sports')">Start betting!</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="logo">BET<span>KING</span></div>
+    <p>18+ only · Gamble Responsibly · T&C Apply</p>
+    <div class="footer-links">
+      <a href="#">Privacy</a><a href="#">Terms</a><a href="#">Support</a><a href="#">Responsible Gambling</a>
+    </div>
+  </div>
+</footer>
+
+<script src="js/config.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/wallet.js"></script>
+<script src="js/sports.js"></script>
+<script src="js/casino.js"></script>
+<script src="js/bets.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
