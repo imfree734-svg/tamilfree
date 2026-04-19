@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChromaWin | Premium Color Prediction</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        .page { display: none; }
+        .page.active { display: block; }
+        .tab-active { border-bottom: 2px solid #eab308; color: #eab308; }
+        @keyframes pulse-ring { 0% { transform: scale(.33); opacity: 1; } 80%, 100% { opacity: 0; } }
+        .active-timer { animation: pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+    <nav id="bottom-nav" class="hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-3 z-50">
+        <button onclick="showPage('game')" class="text-xs flex flex-col items-center gap-1"><span>🎮</span>Home</button>
+        <button onclick="showPage('recharge')" class="text-xs flex flex-col items-center gap-1"><span>💳</span>Recharge</button>
+        <button onclick="showPage('withdraw')" class="text-xs flex flex-col items-center gap-1"><span>💰</span>Withdraw</button>
+        <button onclick="showPage('history')" class="text-xs flex flex-col items-center gap-1"><span>📜</span>History</button>
+    </nav>
+
+    <section id="page-auth" class="page active p-6 max-w-sm mx-auto pt-20">
+        <h1 class="text-4xl font-black text-yellow-500 mb-8 text-center italic">CHROMAWIN</h1>
+        <div class="space-y-4 bg-slate-900 p-6 rounded-2xl border border-slate-800">
+            <input type="email" id="email" placeholder="Email Address" class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 outline-none focus:border-yellow-500">
+            <input type="password" id="password" placeholder="Password" class="w-full p-3 rounded-lg bg-slate-800 border border-slate-700 outline-none focus:border-yellow-500">
+            <button onclick="handleAuth('login')" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-lg hover:bg-yellow-400 transition">Login / Register</button>
+        </div>
+    </section>
+
+    <section id="page-game" class="page p-4 pb-24 max-w-md mx-auto">
+        <header class="flex justify-between items-center mb-6">
+            <div class="bg-slate-900 px-4 py-2 rounded-full border border-slate-800">
+                <span class="text-xs text-slate-400">Balance: </span>
+                <span id="wallet-val" class="font-bold text-green-400">₹0.00</span>
+            </div>
+            <button onclick="syncData()" class="text-slate-400 text-sm">🔄 Refresh</button>
+        </header>
+
+        <div class="relative bg-gradient-to-br from-indigo-600 to-purple-800 p-8 rounded-3xl text-center shadow-2xl mb-6">
+            <p class="text-sm text-indigo-200 mb-1">Time Remaining</p>
+            <div id="countdown" class="text-6xl font-black tracking-tighter">00:30</div>
+            <p class="mt-2 text-xs opacity-60">Period: <span id="period-id">20260419102</span></p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-8">
+            <button onclick="openBetModal('green')" class="bg-green-500 h-24 rounded-2xl font-black text-xl shadow-lg hover:brightness-110 active:scale-95 transition">GREEN</button>
+            <button onclick="openBetModal('violet')" class="bg-violet-500 h-24 rounded-2xl font-black text-xl shadow-lg hover:brightness-110 active:scale-95 transition">VIOLET</button>
+            <button onclick="openBetModal('red')" class="bg-red-500 h-24 rounded-2xl font-black text-xl shadow-lg hover:brightness-110 active:scale-95 transition">RED</button>
+        </div>
+
+        <h3 class="font-bold mb-4 flex items-center gap-2"><span>📊</span> Recent Results</h3>
+        <div id="results-box" class="flex gap-2 flex-wrap mb-4"></div>
+    </section>
+
+    <section id="page-recharge" class="page p-6 max-w-md mx-auto">
+        <h2 class="text-2xl font-bold mb-6">Deposit Money</h2>
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="initPayment(500)" class="bg-slate-900 p-6 rounded-xl border border-slate-700 font-bold hover:border-yellow-500">₹500</button>
+            <button onclick="initPayment(1000)" class="bg-slate-900 p-6 rounded-xl border border-slate-700 font-bold hover:border-yellow-500">₹1000</button>
+            <button onclick="initPayment(5000)" class="bg-slate-900 p-6 rounded-xl border border-slate-700 font-bold hover:border-yellow-500">₹5000</button>
+            <button onclick="initPayment(10000)" class="bg-slate-900 p-6 rounded-xl border border-slate-700 font-bold hover:border-yellow-500">₹10000</button>
+        </div>
+    </section>
+
+    <section id="page-history" class="page p-6 max-w-md mx-auto pb-24">
+        <h2 class="text-2xl font-bold mb-6">Your Bets</h2>
+        <div id="history-content" class="space-y-4"></div>
+    </section>
+
+    <div id="bet-modal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-end justify-center p-4">
+        <div class="bg-slate-900 w-full max-w-md p-6 rounded-t-3xl border-t border-slate-700">
+            <h4 class="text-lg font-bold mb-4">Select Amount (<span id="selected-color-text"></span>)</h4>
+            <div class="grid grid-cols-4 gap-2 mb-6">
+                <button onclick="setAmt(100)" class="bg-slate-800 py-2 rounded">100</button>
+                <button onclick="setAmt(500)" class="bg-slate-800 py-2 rounded">500</button>
+                <button onclick="setAmt(1000)" class="bg-slate-800 py-2 rounded">1K</button>
+                <button onclick="setAmt(5000)" class="bg-slate-800 py-2 rounded">5K</button>
+            </div>
+            <input type="number" id="bet-amount" class="w-full bg-slate-950 p-4 rounded-xl border border-slate-700 text-center text-2xl font-bold mb-4" value="100">
+            <div class="flex gap-4">
+                <button onclick="closeModal()" class="flex-1 text-slate-400">Cancel</button>
+                <button onclick="confirmBet()" class="flex-1 bg-yellow-500 text-black font-bold py-4 rounded-xl">Confirm Bet</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- API CONFIGURATION ---
+        const SB_URL = "https://opihlskhqvbojkhdmjgz.supabase.co";
+        const SB_KEY = "sb_publishable_UwKSMM5fuGrdTwZ9o_zO0g_m2hIuhAc";
+        const RZP_KEY = "YOUR_RAZORPAY_KEY_ID";
+        
+        const supabase = lib.supabase.createClient(SB_URL, SB_KEY);
+        let user = null;
+        let wallet = 0;
+        let selectedColor = "";
+
+        // --- NAVIGATION ---
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            if(pageId === 'history') loadHistory();
+        }
+
+        // --- AUTH LOGIC ---
+        async function handleAuth(type) {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                // If login fails, try signup
+                const { data: upData, error: upError } = await supabase.auth.signUp({ email, password });
+                if (upError) return alert(upError.message);
+                user = upData.user;
+            } else {
+                user = data.user;
+            }
+
+            document.getElementById('bottom-nav').classList.remove('hidden');
+            showPage('game');
+            syncData();
+        }
+
+        async function syncData() {
+            const { data } = await supabase.from('profiles').select('wallet').eq('id', user.id).single();
+            if (data) {
+                wallet = data.wallet;
+                document.getElementById('wallet-val').innerText = `₹${wallet.toLocaleString()}`;
+            }
+        }
+
+        // --- GAME ENGINE ---
+        let timeLeft = 30;
+        setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 0) {
+                timeLeft = 30;
+                resolveRound();
+            }
+            document.getElementById('countdown').innerText = `00:${timeLeft < 10 ? '0'+timeLeft : timeLeft}`;
+            if (timeLeft <= 5) document.getElementById('countdown').classList.add('text-red-500');
+            else document.getElementById('countdown').classList.remove('text-red-500');
+        }, 1000);
+
+        function resolveRound() {
+            const colors = ['red', 'green', 'violet'];
+            const result = colors[Math.floor(Math.random() * colors.length)];
+            const resBox = document.getElementById('results-box');
+            const dot = `<div class="w-8 h-8 rounded-full bg-${result}-500 shadow-lg animate-bounce"></div>`;
+            resBox.innerHTML = dot + resBox.innerHTML;
+            syncData();
+        }
+
+        // --- BETTING ---
+        function openBetModal(color) {
+            if (timeLeft <= 5) return alert("Betting closed for this round!");
+            selectedColor = color;
+            document.getElementById('selected-color-text').innerText = color.toUpperCase();
+            document.getElementById('bet-modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('bet-modal').classList.add('hidden'); }
+        function setAmt(val) { document.getElementById('bet-amount').value = val; }
+
+        async function confirmBet() {
+            const amount = parseInt(document.getElementById('bet-amount').value);
+            if (amount > wallet) return alert("Insufficient balance!");
+
+            const { error } = await supabase.from('bets').insert([
+                { user_id: user.id, amount, choice: selectedColor, status: 'pending' }
+            ]);
+
+            if (!error) {
+                wallet -= amount;
+                await supabase.from('profiles').update({ wallet }).eq('id', user.id);
+                syncData();
+                closeModal();
+                alert("Bet Placed!");
+            }
+        }
+
+        // --- PAYMENTS ---
+        function initPayment(amt) {
+            const options = {
+                key: RZP_KEY,
+                amount: amt * 100,
+                currency: "INR",
+                name: "ChromaWin Wallet",
+                handler: async function (response) {
+                    wallet += amt;
+                    await supabase.from('profiles').update({ wallet }).eq('id', user.id);
+                    syncData();
+                    alert("Recharge Successful!");
+                }
+            };
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+
+        async function loadHistory() {
+            const { data } = await supabase.from('bets').select('*').eq('user_id', user.id).order('id', {ascending: false});
+            const content = document.getElementById('history-content');
+            content.innerHTML = data.map(b => `
+                <div class="bg-slate-900 p-4 rounded-xl border-l-4 border-${b.choice}-500 flex justify-between">
+                    <div>
+                        <p class="text-sm font-bold uppercase">${b.choice}</p>
+                        <p class="text-xs text-slate-500">Amount: ₹${b.amount}</p>
+                    </div>
+                    <span class="text-xs text-yellow-500">${b.status}</span>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
